@@ -49,5 +49,14 @@ next-env.d.ts
 /public/vendor/
 
 # agent instruction files (Next.js re-creates AGENTS.md on `next dev`)
+.ana_instructs
 AGENTS.md
 CLAUDE.md
+CODEX.md
+ANTI-GRAVITY.md
+.cline_rules
+.cursor_rules
+.windsor_rules
+
+# launch video renders (/brag)
+brag-output*/

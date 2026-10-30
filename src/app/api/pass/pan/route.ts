@@ -1,6 +1,6 @@
 import { PAN_PATTERN } from "@/lib/pan/parse";
 import { buildPanPass } from "@/lib/pass/panPass";
-import { BadRequest, errorResponse, passResponse, readStrip, siteUrlFor } from "@/lib/pass/http";
+import { BadRequest, errorResponse, passResponse, readStrip, requireTerms, siteUrlFor } from "@/lib/pass/http";
 
 const MAX_QR_BYTES = 8_000;
 const MAX_TEXT = 100;
@@ -13,6 +13,7 @@ function text(form: FormData, key: string): string {
 export async function POST(request: Request) {
   try {
     const form = await request.formData();
+    requireTerms(form);
     const pan = text(form, "pan").toUpperCase();
     if (!PAN_PATTERN.test(pan)) throw new BadRequest("That doesn't look like a valid PAN.");
     const dob = text(form, "dob");

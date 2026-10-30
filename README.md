@@ -129,7 +129,7 @@ npm run dev                       # http://localhost:3000
 ## Project layout
 
 ```
-src/app/                    UI: ID picker, one flow per ID, Add to Wallet button, /qr (large QR), /preview (dev)
+src/app/                    UI: ID picker, one flow per ID, welcome/terms dialog, /terms, /qr (large QR), /preview (dev)
 src/app/api/pass/<id>/      Pass signing endpoints (aadhaar, pan, dl, voter)
 src/lib/<id>/               Per-ID parsing: Aadhaar Secure QR, PAN/DL/e-EPIC text, voter OCR
 src/lib/client/             Browser-only: document scanning, photo/signature detection, OCR, card renderers
@@ -148,7 +148,9 @@ npm run lint
 
 ## Disclaimer
 
-This is an independent project, not affiliated with UIDAI, the Income Tax Department, MoRTH/DigiLocker, the Election Commission of India or Apple. Passes are personal convenience copies and are not valid as official identity documents; card designs omit the State Emblem and official logos. Always verify identity using the original QR with the issuer's app.
+Using the site requires accepting its [Terms of Use & Privacy](https://ids-applewallet.arshanwar.me/terms) (shown on first visit; the pass endpoints refuse to sign without the current version, set in `src/lib/terms.ts`).
+
+This is an independent project, not affiliated with, endorsed by, or connected to the Government of India, UIDAI, the Income Tax Department, MoRTH/DigiLocker, the Election Commission of India, any other government body, or Apple. Passes are personal convenience copies and are not valid as official identity documents; card designs omit the State Emblem and official logos. Always verify identity using the original QR with the issuer's app.
 
 Apple Wallet and the Apple Wallet badge are trademarks of Apple Inc. The badge is used according to Apple's [Add to Apple Wallet guidelines](https://developer.apple.com/wallet/add-to-apple-wallet-guidelines/).
 

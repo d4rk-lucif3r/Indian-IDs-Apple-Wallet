@@ -1,10 +1,18 @@
 import "server-only";
 import { PassConfigError } from "./config";
+import { TERMS_VERSION } from "@/lib/terms";
 
 const MAX_STRIP_BYTES = 2_000_000;
 const PNG_DATA_URL = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/;
 
 export class BadRequest extends Error {}
+
+// Passes are only signed for users who accepted the current terms on the site.
+export function requireTerms(form: FormData) {
+  if (form.get("termsVersion") !== TERMS_VERSION) {
+    throw new BadRequest("Please open the website and accept the terms before adding a pass.");
+  }
+}
 
 export function readStrip(form: FormData): Buffer | null {
   const match = PNG_DATA_URL.exec(String(form.get("strip") ?? ""));

@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Copied from node_modules by scripts/copy-vendor.mjs
     "public/vendor/**",
+    // Launch-video renders and their build scripts (/brag)
+    "brag-output*/**",
   ]),
 ]);
 

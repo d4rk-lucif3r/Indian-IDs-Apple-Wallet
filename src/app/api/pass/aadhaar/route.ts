@@ -1,7 +1,7 @@
 import { gunzipSync, inflateSync } from "node:zlib";
 import { parseSecureQr, SecureQrError } from "@/lib/aadhaar/secureQr";
 import { buildAadhaarPass } from "@/lib/pass/aadhaarPass";
-import { BadRequest, errorResponse, passResponse, readStrip, siteUrlFor } from "@/lib/pass/http";
+import { BadRequest, errorResponse, passResponse, readStrip, requireTerms, siteUrlFor } from "@/lib/pass/http";
 
 const MAX_QR_LENGTH = 20_000;
 
@@ -15,6 +15,7 @@ const decompress = async (bytes: Uint8Array) => {
 export async function POST(request: Request) {
   try {
     const form = await request.formData();
+    requireTerms(form);
     const qrText = String(form.get("qr") ?? "");
     const vidDigits = String(form.get("vid") ?? "").replace(/\s/g, "");
     const vid = /^\d{16}$/.test(vidDigits) ? vidDigits.replace(/(\d{4})(?=\d)/g, "$1 ") : null;

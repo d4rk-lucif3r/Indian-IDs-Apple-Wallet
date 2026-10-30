@@ -1,6 +1,6 @@
 import { EPIC_PATTERN, type VoterDetails } from "@/lib/voter/parse";
 import { buildVoterPass } from "@/lib/pass/voterPass";
-import { BadRequest, errorResponse, passResponse, readStrip } from "@/lib/pass/http";
+import { BadRequest, errorResponse, passResponse, readStrip, requireTerms } from "@/lib/pass/http";
 
 const FIELDS: (keyof VoterDetails)[] = [
   "epicNo", "name", "nameHi", "relationLabel", "relationName", "relationNameHi", "gender", "dob", "address", "ero",
@@ -12,6 +12,7 @@ const MAX_QR = 4_000;
 export async function POST(request: Request) {
   try {
     const form = await request.formData();
+    requireTerms(form);
     const v = Object.fromEntries(
       FIELDS.map((k) => [k, String(form.get(k) ?? "").trim().slice(0, 200)]),
     ) as unknown as VoterDetails;
