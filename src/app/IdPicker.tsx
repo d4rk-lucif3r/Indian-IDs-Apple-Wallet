@@ -15,6 +15,14 @@ const IDS = [
 
 const FLOWS = { aadhaar: AadhaarFlow, pan: PanFlow, dl: DlFlow, voter: VoterFlow };
 
+const COMING_SOON = [
+  { title: "Passport", subtitle: "पासपोर्ट · photo page" },
+  { title: "Vehicle RC", subtitle: "वाहन पंजीकरण · DigiLocker PDF" },
+  { title: "ABHA Health Card", subtitle: "आभा · Ayushman Bharat Health Account" },
+  { title: "Ayushman Card", subtitle: "आयुष्मान कार्ड · PM-JAY" },
+  { title: "e-Shram Card", subtitle: "ई-श्रम कार्ड · Labour ID" },
+];
+
 type IdKind = (typeof IDS)[number]["id"];
 
 export default function IdPicker() {
@@ -51,6 +59,19 @@ export default function IdPicker() {
             <span className="block text-xs text-neutral-500">{id.subtitle}</span>
           </span>
         </button>
+      ))}
+      <p className="pt-3 text-sm font-medium text-neutral-500">Coming soon</p>
+      {COMING_SOON.map((id) => (
+        <div
+          key={id.title}
+          className="flex items-center gap-4 rounded-2xl border border-dashed border-neutral-200 p-4 text-neutral-400 dark:border-neutral-800"
+        >
+          <span className="h-10 w-14 shrink-0 rounded-md bg-neutral-100 dark:bg-neutral-900" />
+          <span>
+            <span className="block font-medium">{id.title}</span>
+            <span className="block text-xs">{id.subtitle}</span>
+          </span>
+        </div>
       ))}
     </div>
   );

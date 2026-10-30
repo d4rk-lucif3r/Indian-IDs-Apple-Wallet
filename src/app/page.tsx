@@ -11,8 +11,25 @@ export default function Home() {
         </p>
       </header>
       <IdPicker />
-      <footer className="mt-auto space-y-1 text-xs text-neutral-500">
-        <p>Download your e-documents from DigiLocker or the issuing portal. Passes are personal convenience copies, not official documents.</p>
+      <footer className="mt-auto space-y-3 pt-6 text-xs text-neutral-500">
+        <div className="space-y-1 rounded-2xl bg-neutral-100 p-4 dark:bg-neutral-900">
+          <p className="font-medium text-neutral-700 dark:text-neutral-300">🔒 Your files never leave your device</p>
+          <p>
+            PDFs and photos are opened and read entirely in your browser — they&apos;re never uploaded. To create the
+            pass, only what appears on it (the card image, its details and QR) is sent to be signed, then discarded.
+            Nothing is stored.
+          </p>
+        </div>
+        <p>
+          Download your e-documents from DigiLocker or the issuing portal. Passes are personal convenience copies, not
+          official documents.
+        </p>
+        <p>
+          Made by{" "}
+          <a href="https://www.arshanwar.com" target="_blank" rel="noopener noreferrer" className="underline">
+            Arsh Anwar
+          </a>
+        </p>
       </footer>
     </main>
   );

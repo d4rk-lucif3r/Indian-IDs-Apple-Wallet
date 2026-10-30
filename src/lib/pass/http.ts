@@ -13,9 +13,19 @@ export function readStrip(form: FormData): Buffer | null {
   return png.length <= MAX_STRIP_BYTES ? png : null;
 }
 
-// Link target for "Show large QR"; PUBLIC_URL wins when served behind a proxy/tunnel.
+// Link target for "Show large QR". PUBLIC_URL wins when it's a real URL (e.g. behind a proxy or
+// tunnel); otherwise — unset, malformed, or still the .env placeholder — use the request's origin.
 export function siteUrlFor(request: Request): string {
-  return process.env.PUBLIC_URL || new URL(request.url).origin;
+  const configured = process.env.PUBLIC_URL?.trim();
+  if (configured) {
+    try {
+      const url = new URL(configured);
+      if (/^https?:$/.test(url.protocol) && !/your-domain/i.test(url.hostname)) return url.origin;
+    } catch {
+      // fall through to the request origin
+    }
+  }
+  return new URL(request.url).origin;
 }
 
 export function passResponse(pkpass: Buffer, filename: string): Response {
