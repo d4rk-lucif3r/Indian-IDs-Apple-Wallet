@@ -1,4 +1,6 @@
 import type { DlDetails } from "@/lib/dl/parse";
+import { TERMS_VERSION } from "@/lib/terms";
+import { audit, consentFromForm, countryOf } from "@/lib/pass/audit";
 import { buildDlPass } from "@/lib/pass/dlPass";
 import { BadRequest, errorResponse, passResponse, readStrip, requireTerms } from "@/lib/pass/http";
 
@@ -19,7 +21,9 @@ export async function POST(request: Request) {
     if (!d.licenceNo || !d.name) throw new BadRequest("Licence number and name are required.");
     const qrText = String(form.get("qr") ?? "");
     if (qrText.length > MAX_QR) throw new BadRequest("Invalid QR data.");
-    return passResponse(buildDlPass(d, { stripPng: readStrip(form), qrText: qrText || null }), "driving-licence.pkpass", form);
+    const pkpass = buildDlPass(d, { stripPng: readStrip(form), qrText: qrText || null });
+    audit({ event: "pass_created", idType: "dl", termsVersion: TERMS_VERSION, ...consentFromForm(form), country: countryOf(request) });
+    return passResponse(pkpass, "driving-licence.pkpass", form);
   } catch (err) {
     return errorResponse(err);
   }

@@ -1,7 +1,7 @@
 // Terms the user must accept before using the site. Shared by the welcome dialog, the /terms page
 // and the pass endpoints (which refuse to sign without the current version). Bump the version
 // whenever the terms change, so everyone is asked to accept again.
-export const TERMS_VERSION = "2026-10-30";
+export const TERMS_VERSION = "2026-10-30.2"; // .2: discloses the anonymous audit log
 
 export const REPO_URL = "https://github.com/d4rk-lucif3r/Indian-IDs-Apple-Wallet";
 

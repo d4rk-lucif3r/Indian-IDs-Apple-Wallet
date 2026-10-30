@@ -5,6 +5,7 @@
 // picker stays locked until the box is ticked, and the box resets every time the picker is shown.
 import { useState } from "react";
 import Link from "next/link";
+import { setUploadConfirmed } from "@/lib/client/termsStore";
 
 export default function FilePicker({
   title,
@@ -32,7 +33,10 @@ export default function FilePicker({
           className="mt-0.5 h-4 w-4 shrink-0 accent-black dark:accent-white"
           checked={confirmed}
           disabled={busy}
-          onChange={(e) => setConfirmed(e.target.checked)}
+          onChange={(e) => {
+            setConfirmed(e.target.checked);
+            setUploadConfirmed(e.target.checked);
+          }}
         />
         <span>
           This is my own document (or I&apos;m authorised by its holder), I understand the pass is a personal copy and

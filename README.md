@@ -61,8 +61,10 @@ Passes are **personal convenience copies, not official documents** — every car
 ## Privacy
 
 - **Your files never leave your device.** PDFs and photos are opened, unlocked and read in the browser: [pdf.js](https://mozilla.github.io/pdf.js/) for PDFs, [zxing-wasm](https://github.com/Sec-ant/zxing-wasm) for QR codes, and [Tesseract](https://github.com/naptha/tesseract.js) for OCR (English + Hindi). All of these are served from this site — no third-party CDNs.
-- **Only the pass contents are sent to the server** — the card image, the details shown on it and the QR — because an Apple Wallet pass has to be signed with a certificate that can't live in the browser. The server signs the pass, streams it back and keeps nothing: no database, no files, no logging of contents.
+- **Only the pass contents are sent to the server** — the card image, the details shown on it and the QR — because an Apple Wallet pass has to be signed with a certificate that can't live in the browser. The server signs the pass and streams it back; pass contents are never stored or logged.
+- **Anonymous usage & consent log.** Each terms acceptance and pass creation is recorded with only: event type, ID type, terms version, timestamps, a random consent ID generated in the browser, and country. No names, numbers, photos, QR contents, images or IP addresses. Kept up to 3 years (Upstash Redis; optional — skipped if not configured).
 - The one cookie the site sets is a random token used to stop the "Creating your pass…" spinner.
+- Using the site requires accepting the terms (first-visit dialog + a confirmation on every upload); the pass endpoints refuse to sign without the current terms version.
 
 ```
  Your device (browser)                                      Server (one stateless function)
@@ -125,6 +127,8 @@ npm run dev                       # http://localhost:3000
 | `ORGANIZATION_NAME` | Shown as the pass issuer in Wallet |
 | `PUBLIC_URL` | Base URL for "Show large QR" links (falls back to the request's own origin) |
 | `PASS_SIGNER_CERT_B64`, `PASS_SIGNER_KEY_B64`, `PASS_WWDR_B64` | Base64 of the PEMs in `certs/` (locally, the PEM files are read directly instead) |
+| `KV_REST_API_URL`, `KV_REST_API_TOKEN` | *Optional.* Upstash Redis for the anonymous usage & consent log — added automatically by Vercel → Storage → Upstash |
+| `STATS_TOKEN` | *Optional.* Secret (16+ chars) for `GET /api/stats` with `Authorization: Bearer <token>`; add `?audit=YYYY-MM-DD` for that day's records |
 
 ---
 

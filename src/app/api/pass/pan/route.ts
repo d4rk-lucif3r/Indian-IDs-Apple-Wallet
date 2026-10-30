@@ -1,3 +1,5 @@
+import { TERMS_VERSION } from "@/lib/terms";
+import { audit, consentFromForm, countryOf } from "@/lib/pass/audit";
 import { PAN_PATTERN } from "@/lib/pan/parse";
 import { buildPanPass } from "@/lib/pass/panPass";
 import { BadRequest, errorResponse, passResponse, readStrip, requireTerms, siteUrlFor } from "@/lib/pass/http";
@@ -27,6 +29,7 @@ export async function POST(request: Request) {
       { pan, name: text(form, "name"), fatherName: text(form, "fatherName"), dob },
       { stripPng: readStrip(form), qrBytes, siteUrl: siteUrlFor(request) },
     );
+    audit({ event: "pass_created", idType: "pan", termsVersion: TERMS_VERSION, ...consentFromForm(form), country: countryOf(request) });
     return passResponse(pkpass, "pan.pkpass", form);
   } catch (err) {
     return errorResponse(err);

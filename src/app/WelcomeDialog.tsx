@@ -5,13 +5,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { NOT_AFFILIATED, TERMS_POINTS } from "@/lib/terms";
-import { acceptTerms, hasAcceptedCurrentTerms, useAcceptedTerms } from "@/lib/client/termsStore";
+import { acceptTerms, hasAcceptedCurrentTerms, useConsent } from "@/lib/client/termsStore";
 import GitHubLink from "./GitHubLink";
 
 export default function WelcomeDialog() {
-  const accepted = useAcceptedTerms();
+  const consent = useConsent();
   const [agreed, setAgreed] = useState(false);
-  const open = accepted !== undefined && !hasAcceptedCurrentTerms(accepted);
+  const open = consent !== undefined && !hasAcceptedCurrentTerms(consent);
 
   // Keep the page behind from scrolling while the dialog is up.
   useEffect(() => {
@@ -51,7 +51,8 @@ export default function WelcomeDialog() {
           <p className="font-medium">🔒 Privacy first</p>
           <p className="text-neutral-600 dark:text-neutral-400">
             Your files are read entirely in your browser and never uploaded. Only what appears on the pass is sent to
-            be signed, then discarded. Nothing is stored.
+            be signed, then discarded. No document data is stored; only an anonymous record that the terms were
+            accepted and a pass was created.
           </p>
         </section>
 

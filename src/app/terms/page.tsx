@@ -93,15 +93,23 @@ export default function Terms() {
           <li>
             <strong>Only the pass contents are sent to be signed:</strong> the card image, the details shown on it and
             its QR. Apple Wallet passes must be cryptographically signed with a certificate that can&apos;t be kept in a
-            browser, so this happens on the server, which builds and signs the pass, returns it to you and keeps
-            nothing: there is no database, no file storage and no logging of pass contents.
+            browser, so this happens on the server, which builds and signs the pass and returns it to you. The pass
+            contents are never stored or logged.
+          </li>
+          <li>
+            <strong>Anonymous usage and consent log.</strong> To count usage and to keep evidence that passes are only
+            created after these terms are accepted, the site records: that the terms were accepted or a pass was
+            created, the type of ID (e.g. &quot;PAN&quot;), the terms version, the times you accepted the terms and ticked
+            the upload confirmation, a random consent ID generated in your browser when you accepted, and your country
+            (as reported by the hosting provider). It never records names, ID numbers, photos, addresses, QR contents,
+            card images or IP addresses. These records are kept for up to 3 years, then deleted.
           </li>
           <li>
             Text-recognition (OCR) data and other tools are served from this site; no third-party content is loaded
             while you use it.
           </li>
           <li>
-            Your agreement to these terms is remembered in your browser&apos;s local storage. One short-lived cookie
+            Your agreement to these terms (with its random consent ID) is remembered in your browser&apos;s local storage. One short-lived cookie
             containing a random token is used to show when your pass is ready. There are no analytics or advertising
             cookies.
           </li>

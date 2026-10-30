@@ -14,8 +14,8 @@ export default function Home() {
           <GitHubLink label="GitHub" />
         </div>
         <p className="text-sm text-neutral-500">
-          Upload your official e-document. It&apos;s read on your phone, the original QR goes onto the pass, and
-          nothing is stored.
+          Upload your official e-document. It&apos;s read on your phone, the original QR goes onto the pass, and your
+          documents are never stored.
         </p>
       </header>
       <IdPicker />
@@ -24,8 +24,8 @@ export default function Home() {
           <p className="font-medium text-neutral-700 dark:text-neutral-300">🔒 Your files never leave your device</p>
           <p>
             PDFs and photos are opened and read entirely in your browser — they&apos;re never uploaded. To create the
-            pass, only what appears on it (the card image, its details and QR) is sent to be signed, then discarded.
-            Nothing is stored.
+            pass, only what appears on it (the card image, its details and QR) is sent to be signed, then discarded. No
+            document data is stored.
           </p>
         </div>
         <p>

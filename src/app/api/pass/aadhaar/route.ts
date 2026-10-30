@@ -1,3 +1,5 @@
+import { TERMS_VERSION } from "@/lib/terms";
+import { audit, consentFromForm, countryOf } from "@/lib/pass/audit";
 import { gunzipSync, inflateSync } from "node:zlib";
 import { parseSecureQr, SecureQrError } from "@/lib/aadhaar/secureQr";
 import { buildAadhaarPass } from "@/lib/pass/aadhaarPass";
@@ -30,6 +32,7 @@ export async function POST(request: Request) {
       ? uidDigits.replace(/(\d{4})(?=\d)/g, "$1 ")
       : null;
     const pkpass = buildAadhaarPass(qr, qrText, readStrip(form), { vid, uid, siteUrl: siteUrlFor(request) });
+    audit({ event: "pass_created", idType: "aadhaar", termsVersion: TERMS_VERSION, ...consentFromForm(form), country: countryOf(request) });
     return passResponse(pkpass, "aadhaar.pkpass", form);
   } catch (err) {
     return errorResponse(err);

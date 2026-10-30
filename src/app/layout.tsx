@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Indian IDs → Apple Wallet",
-  description: "Add your Aadhaar, PAN, Driving Licence and Voter ID to Apple Wallet. Processed on your device; nothing is stored.",
+  description: "Add your Aadhaar, PAN, Driving Licence and Voter ID to Apple Wallet. Processed on your device; your documents are never stored.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

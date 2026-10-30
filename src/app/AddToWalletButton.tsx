@@ -9,7 +9,7 @@
 // observe finishing. Each tap sends a one-time token; the server echoes it back as a short-lived
 // cookie alongside the pass, and the spinner stops when that cookie appears.
 import { useEffect, useRef, useState } from "react";
-import { useAcceptedTerms } from "@/lib/client/termsStore";
+import { getUploadConfirmedAt, useConsent } from "@/lib/client/termsStore";
 
 const COOKIE = "passReady"; // keep in sync with DOWNLOAD_COOKIE in src/lib/pass/http.ts
 const TIMEOUT_MS = 25_000;
@@ -22,7 +22,9 @@ function hasCookie(token: string) {
 
 export default function AddToWalletButton({ ready = true, waitingText }: { ready?: boolean; waitingText?: string }) {
   const [phase, setPhase] = useState<Phase>("idle");
-  const acceptedTerms = useAcceptedTerms(); // sent with the form; the server refuses to sign without it
+  // Consent evidence sent with the form; the server refuses to sign without the current terms.
+  const consent = useConsent();
+  const uploadInput = useRef<HTMLInputElement>(null);
   const tokenInput = useRef<HTMLInputElement>(null);
   const timers = useRef<number[]>([]);
 
@@ -35,6 +37,7 @@ export default function AddToWalletButton({ ready = true, waitingText }: { ready
   function start() {
     const token = crypto.randomUUID();
     tokenInput.current!.value = token; // set before the form submits
+    uploadInput.current!.value = getUploadConfirmedAt() ?? "";
     clearTimers();
     // Swap the badge for the spinner on the next tick: unmounting the submit button inside its own
     // click handler can cancel the form submission.
@@ -65,7 +68,10 @@ export default function AddToWalletButton({ ready = true, waitingText }: { ready
   return (
     <div className="space-y-2">
       <input ref={tokenInput} type="hidden" name="downloadToken" />
-      <input type="hidden" name="termsVersion" value={acceptedTerms ?? ""} />
+      <input type="hidden" name="termsVersion" value={consent?.version ?? ""} />
+      <input type="hidden" name="consentId" value={consent?.id ?? ""} />
+      <input type="hidden" name="termsAcceptedAt" value={consent?.at ?? ""} />
+      <input ref={uploadInput} type="hidden" name="uploadConfirmedAt" />
       {phase === "creating" ? (
         <div role="status" className="flex h-[68px] items-center justify-center gap-3 text-sm text-neutral-600 dark:text-neutral-300">
           <span className="h-5 w-5 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-900 dark:border-neutral-700 dark:border-t-white" />
