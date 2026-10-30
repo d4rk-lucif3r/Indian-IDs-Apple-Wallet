@@ -1,0 +1,39 @@
+import "server-only";
+import { PassConfigError } from "./config";
+
+const MAX_STRIP_BYTES = 2_000_000;
+const PNG_DATA_URL = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/;
+
+export class BadRequest extends Error {}
+
+export function readStrip(form: FormData): Buffer | null {
+  const match = PNG_DATA_URL.exec(String(form.get("strip") ?? ""));
+  if (!match) return null;
+  const png = Buffer.from(match[1], "base64");
+  return png.length <= MAX_STRIP_BYTES ? png : null;
+}
+
+// Link target for "Show large QR"; PUBLIC_URL wins when served behind a proxy/tunnel.
+export function siteUrlFor(request: Request): string {
+  return process.env.PUBLIC_URL || new URL(request.url).origin;
+}
+
+export function passResponse(pkpass: Buffer, filename: string): Response {
+  return new Response(new Uint8Array(pkpass), {
+    headers: {
+      "Content-Type": "application/vnd.apple.pkpass",
+      "Content-Disposition": `inline; filename="${filename}"`,
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+export function errorResponse(err: unknown): Response {
+  if (err instanceof BadRequest) return new Response(err.message, { status: 400 });
+  if (err instanceof PassConfigError) {
+    console.error(err.message);
+    return new Response("Pass signing is not configured on the server.", { status: 500 });
+  }
+  console.error(err);
+  return new Response("Couldn't create the pass.", { status: 500 });
+}
