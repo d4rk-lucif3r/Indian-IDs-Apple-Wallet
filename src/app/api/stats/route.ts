@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { ID_TYPES, redisPipeline } from "@/lib/pass/audit";
+import { ID_TYPES, redisPipeline, storageDiagnostics } from "@/lib/pass/audit";
 
 // Private usage numbers: GET /api/stats with "Authorization: Bearer <STATS_TOKEN>".
 // Add ?audit=YYYY-MM-DD to also return that day's anonymous audit records.
@@ -25,8 +25,23 @@ export async function GET(request: Request) {
   const commands: (string | number)[][] = [["MGET", ...keys]];
   if (auditDay && /^\d{4}-\d{2}-\d{2}$/.test(auditDay)) commands.push(["LRANGE", `audit:${auditDay}`, 0, 999]);
 
-  const result = await redisPipeline(commands).catch(() => null);
-  if (!result) return Response.json({ error: "Analytics storage is not configured or unreachable." }, { status: 503 });
+  const diag = storageDiagnostics();
+  if (!diag.configured) {
+    return Response.json(
+      { error: "Analytics storage is not configured: no KV_REST_API_URL/TOKEN (or UPSTASH_REDIS_REST_URL/TOKEN) found.", ...diag },
+      { status: 503 },
+    );
+  }
+  let result: unknown[] | null;
+  try {
+    result = await redisPipeline(commands);
+  } catch (err) {
+    return Response.json(
+      { error: `Analytics storage is unreachable: ${err instanceof Error ? err.message : "unknown error"}`, ...diag },
+      { status: 503 },
+    );
+  }
+  if (!result) return Response.json({ error: "Analytics storage returned no data.", ...diag }, { status: 503 });
 
   const values = (result[0] as (string | null)[]).map((v) => Number(v ?? 0));
   const [termsAccepted, passesCreated, ...rest] = values;

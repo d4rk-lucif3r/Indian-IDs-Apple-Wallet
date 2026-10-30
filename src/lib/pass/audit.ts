@@ -16,10 +16,23 @@ export type IdType = (typeof ID_TYPES)[number];
 const UUID = /^[a-f0-9-]{36}$/;
 const ISO = /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/;
 
+// Vercel's Upstash integration names these KV_REST_API_URL/TOKEN, optionally with a custom prefix
+// (e.g. STORAGE_KV_REST_API_URL); Upstash's own docs use UPSTASH_REDIS_REST_URL/TOKEN.
+function env(suffix: string): string | undefined {
+  const key = Object.keys(process.env).find((k) => k === suffix || k.endsWith(`_${suffix}`));
+  return key ? process.env[key] : undefined;
+}
+
 function redis() {
-  const url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN;
+  const url = env("KV_REST_API_URL") ?? env("UPSTASH_REDIS_REST_URL");
+  const token = env("KV_REST_API_TOKEN") ?? env("UPSTASH_REDIS_REST_TOKEN");
   return url && token ? { url: url.replace(/\/$/, ""), token } : null;
+}
+
+/** Which storage settings are visible to the server (names only, for the stats endpoint). */
+export function storageDiagnostics() {
+  const names = Object.keys(process.env).filter((k) => /KV_|UPSTASH|REDIS/.test(k)).sort();
+  return { configured: redis() !== null, envNames: names };
 }
 
 export async function redisPipeline(commands: (string | number)[][]): Promise<unknown[] | null> {
