@@ -61,18 +61,21 @@ export default function IdPicker() {
         </button>
       ))}
       <p className="pt-3 text-sm font-medium text-neutral-500">Coming soon</p>
-      {COMING_SOON.map((id) => (
-        <div
-          key={id.title}
-          className="flex items-center gap-4 rounded-2xl border border-dashed border-neutral-200 p-4 text-neutral-400 dark:border-neutral-800"
-        >
-          <span className="h-10 w-14 shrink-0 rounded-md bg-neutral-100 dark:bg-neutral-900" />
-          <span>
-            <span className="block font-medium">{id.title}</span>
-            <span className="block text-xs">{id.subtitle}</span>
-          </span>
-        </div>
-      ))}
+      {/* Horizontal scroller; bleeds to the screen edges so cards can scroll fully into view. */}
+      <div className="-mx-5 flex snap-x snap-mandatory scroll-px-5 gap-3 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {COMING_SOON.map((id) => (
+          <div
+            key={id.title}
+            className="w-40 shrink-0 snap-start space-y-2 rounded-2xl border border-dashed border-neutral-200 p-3 text-neutral-400 dark:border-neutral-800"
+          >
+            <span className="block h-10 w-14 rounded-md bg-neutral-100 dark:bg-neutral-900" />
+            <span className="block text-sm font-medium">{id.title}</span>
+            <span className="block text-xs leading-snug">{id.subtitle}</span>
+          </div>
+        ))}
+        {/* Trailing space: overflow containers drop their end padding in some browsers. */}
+        <span aria-hidden className="w-2 shrink-0" />
+      </div>
     </div>
   );
 }
