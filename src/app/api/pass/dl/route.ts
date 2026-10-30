@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     if (!d.licenceNo || !d.name) throw new BadRequest("Licence number and name are required.");
     const qrText = String(form.get("qr") ?? "");
     if (qrText.length > MAX_QR) throw new BadRequest("Invalid QR data.");
-    return passResponse(buildDlPass(d, { stripPng: readStrip(form), qrText: qrText || null }), "driving-licence.pkpass");
+    return passResponse(buildDlPass(d, { stripPng: readStrip(form), qrText: qrText || null }), "driving-licence.pkpass", form);
   } catch (err) {
     return errorResponse(err);
   }

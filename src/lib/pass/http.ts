@@ -28,14 +28,23 @@ export function siteUrlFor(request: Request): string {
   return new URL(request.url).origin;
 }
 
-export function passResponse(pkpass: Buffer, filename: string): Response {
-  return new Response(new Uint8Array(pkpass), {
-    headers: {
-      "Content-Type": "application/vnd.apple.pkpass",
-      "Content-Disposition": `inline; filename="${filename}"`,
-      "Cache-Control": "no-store",
-    },
+// The page can't observe a form-POST download finishing, so it sends a one-time token and
+// watches for this cookie to know the pass has arrived (see AddToWalletButton). The value is just
+// that random token, so it is readable by the page and works over plain HTTP in development.
+export const DOWNLOAD_COOKIE = "passReady";
+const TOKEN_PATTERN = /^[a-f0-9-]{36}$/;
+
+export function passResponse(pkpass: Buffer, filename: string, form?: FormData): Response {
+  const headers = new Headers({
+    "Content-Type": "application/vnd.apple.pkpass",
+    "Content-Disposition": `inline; filename="${filename}"`,
+    "Cache-Control": "no-store",
   });
+  const token = String(form?.get("downloadToken") ?? "");
+  if (TOKEN_PATTERN.test(token)) {
+    headers.append("Set-Cookie", `${DOWNLOAD_COOKIE}=${token}; Path=/; Max-Age=60; SameSite=Lax`);
+  }
+  return new Response(new Uint8Array(pkpass), { headers });
 }
 
 export function errorResponse(err: unknown): Response {

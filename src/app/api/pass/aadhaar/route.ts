@@ -29,7 +29,7 @@ export async function POST(request: Request) {
       ? uidDigits.replace(/(\d{4})(?=\d)/g, "$1 ")
       : null;
     const pkpass = buildAadhaarPass(qr, qrText, readStrip(form), { vid, uid, siteUrl: siteUrlFor(request) });
-    return passResponse(pkpass, "aadhaar.pkpass");
+    return passResponse(pkpass, "aadhaar.pkpass", form);
   } catch (err) {
     return errorResponse(err);
   }

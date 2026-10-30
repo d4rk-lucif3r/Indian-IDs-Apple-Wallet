@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       { pan, name: text(form, "name"), fatherName: text(form, "fatherName"), dob },
       { stripPng: readStrip(form), qrBytes, siteUrl: siteUrlFor(request) },
     );
-    return passResponse(pkpass, "pan.pkpass");
+    return passResponse(pkpass, "pan.pkpass", form);
   } catch (err) {
     return errorResponse(err);
   }

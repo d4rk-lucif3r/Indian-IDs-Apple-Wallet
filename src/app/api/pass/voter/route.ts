@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     if (!EPIC_PATTERN.test(v.epicNo)) throw new BadRequest("That doesn't look like a valid EPIC number.");
     const qrText = String(form.get("qr") ?? "");
     if (qrText.length > MAX_QR) throw new BadRequest("Invalid QR data.");
-    return passResponse(buildVoterPass(v, { stripPng: readStrip(form), qrText: qrText || null }), "voter-id.pkpass");
+    return passResponse(buildVoterPass(v, { stripPng: readStrip(form), qrText: qrText || null }), "voter-id.pkpass", form);
   } catch (err) {
     return errorResponse(err);
   }
