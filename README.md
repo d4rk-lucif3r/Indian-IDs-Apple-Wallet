@@ -45,7 +45,7 @@ So this project takes the official e-documents you can already download (e-Aadha
 
 On the back of each pass (ⓘ) you'll find every detail in full, how to verify the QR, and for dense QRs (Aadhaar, PAN) a **Show large QR** link that displays the code full-screen so verifier apps can scan it.
 
-**Something not read correctly?** Every e-PAN, e-EPIC and DigiLocker DL flow has a *Report it privately* panel. It builds a reading report on the device describing only the document's layout — page size, text layer, image sizes and roles, QR length, issuer keywords, which fields were found and (for OCR) confidence per field and region — with no names, numbers, photos or document text. You can review it, copy it, or open a prefilled GitHub issue.
+**Something not read correctly?** Every PAN, Voter ID and Driving Licence flow (PDF or photo) has a *Report it privately* panel. It builds a reading report on the device describing only the document's layout — page size, text layer, image sizes and roles, QR length, issuer keywords, which fields were found and (for OCR) confidence per field and region — with no names, numbers, photos or document text. You can review it, copy it, or open a prefilled GitHub issue.
 
 ## Supported IDs
 
@@ -53,8 +53,8 @@ On the back of each pass (ⓘ) you'll find every detail in full, how to verify t
 |---|---|---|---|---|---|
 | **Aadhaar** | e-Aadhaar PDF (or a photo of its QR) | [myAadhaar](https://myaadhaar.uidai.gov.in/genricDownloadAadhaar) or DigiLocker | First 4 letters of name + birth year | UIDAI Secure QR: name, DOB, gender, C/O, address, photo; full number and VID from the PDF | Original UIDAI Secure QR — verify with **mAadhaar** |
 | **PAN** | e-PAN PDF (or a photo of the card) | [UTIITSL](https://www.pan.utiitsl.com/PAN_ONLINE/ePANCardHome) / [Protean (NSDL)](https://onlineservices.proteantech.in/paam/requestAndDownloadEPAN.html) | Date of birth (DDMMYYYY) | PAN, name, father's name, DOB, photo, signature | Original PAN QR, byte-for-byte — verify with **PAN QR Code Reader** |
-| **Driving Licence** | DigiLocker DL PDF | [DigiLocker](https://www.digilocker.gov.in/) → Issued Documents | — | All licence fields and photo | Original DigiLocker QR — verify with **DigiLocker** |
-| **Voter ID** | e-EPIC PDF | [ECI voters portal](https://voters.eci.gov.in/home/e-epic-download) | — | EPIC no., names (Hindi + English), gender, DOB, address, ERO, constituency, part, serial — via on-device OCR for image-only e-EPICs | Original e-EPIC QR — verify with **ECINET** |
+| **Driving Licence** | DigiLocker DL PDF (or photos of the card) | [DigiLocker](https://www.digilocker.gov.in/) → Issued Documents | — | All licence fields and photo; from card photos via on-device OCR (editable, add your own photo) | Original DigiLocker QR — verify with **DigiLocker** |
+| **Voter ID** | e-EPIC PDF (or photos of the card, front + back) | [ECI voters portal](https://voters.eci.gov.in/home/e-epic-download) | — | EPIC no., names (Hindi + English), gender, DOB, address, ERO, constituency, part, serial — via on-device OCR for image-only e-EPICs | Original e-EPIC QR — verify with **ECINET** |
 
 **Coming soon:** Passport, Vehicle RC, ABHA Health Card, Ayushman Card, e-Shram Card.
 

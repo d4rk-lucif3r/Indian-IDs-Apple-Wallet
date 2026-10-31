@@ -14,13 +14,16 @@ export default function FilePicker({
   busy,
   error,
   onFile,
+  multiple = false,
 }: {
   title: string;
   hint: string;
   accept: string;
   busy: boolean;
   error?: string;
-  onFile: (file: File) => void;
+  // With `multiple`, every chosen file is passed (e.g. front and back photos of a card).
+  onFile: (file: File, all: File[]) => void;
+  multiple?: boolean;
 }) {
   const [confirmed, setConfirmed] = useState(false);
   const locked = busy || !confirmed;
@@ -58,12 +61,13 @@ export default function FilePicker({
         <input
           type="file"
           accept={accept}
+          multiple={multiple}
           className="sr-only"
           disabled={locked}
           onChange={(e) => {
-            const file = e.target.files?.[0];
+            const files = [...(e.target.files ?? [])];
             e.target.value = "";
-            if (file) onFile(file);
+            if (files[0]) onFile(files[0], files);
           }}
         />
       </label>

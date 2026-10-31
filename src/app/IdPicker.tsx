@@ -9,8 +9,8 @@ import VoterFlow from "./VoterFlow";
 const IDS = [
   { id: "aadhaar", title: "Aadhaar", subtitle: "आधार · e-Aadhaar PDF", accent: "from-orange-400 to-green-500" },
   { id: "pan", title: "PAN Card", subtitle: "पैन कार्ड · e-PAN PDF", accent: "from-violet-300 to-sky-400" },
-  { id: "dl", title: "Driving Licence", subtitle: "ड्राइविंग लाइसेंस · DigiLocker PDF", accent: "from-neutral-200 to-neutral-400" },
-  { id: "voter", title: "Voter ID", subtitle: "मतदाता पहचान पत्र · e-EPIC PDF", accent: "from-amber-200 to-rose-300" },
+  { id: "dl", title: "Driving Licence", subtitle: "ड्राइविंग लाइसेंस · DigiLocker PDF or card photo", accent: "from-neutral-200 to-neutral-400" },
+  { id: "voter", title: "Voter ID", subtitle: "मतदाता पहचान पत्र · e-EPIC PDF or card photo", accent: "from-amber-200 to-rose-300" },
 ] as const;
 
 const FLOWS = { aadhaar: AadhaarFlow, pan: PanFlow, dl: DlFlow, voter: VoterFlow };

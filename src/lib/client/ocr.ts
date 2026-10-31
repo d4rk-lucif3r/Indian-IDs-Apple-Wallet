@@ -68,3 +68,18 @@ export async function recognize(
     .map((l) => ({ text: l.text.trim(), confidence: l.confidence }));
   return { text: data.text, confidence: data.confidence, lines };
 }
+
+// Loads a photo/screenshot into a canvas for OCR, scaled so its longer side is at most `maxSide`
+// (phone photos are often 4000px+, which is slow and can exceed iOS canvas limits).
+export async function fileToCanvas(file: File, maxSide = 2400): Promise<HTMLCanvasElement> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const c = document.createElement("canvas");
+  c.width = Math.round(bitmap.width * scale);
+  c.height = Math.round(bitmap.height * scale);
+  c.getContext("2d")!.drawImage(bitmap, 0, 0, c.width, c.height);
+  bitmap.close();
+  return c;
+}
+
+export const isPdf = (file: File) => file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");

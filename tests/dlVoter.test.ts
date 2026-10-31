@@ -93,3 +93,48 @@ test("parses Hindi names from Hindi-model OCR, dropping background-dot junk", ()
   const t = ["'नाम: आशा वर्मा  ............ .. ... ......", "चिंका&: डी माधव... ..................", "पिता का नाम: रमेश वर्मा . ः ."].join("\n");
   assert.deepEqual(parseVoterHindi(t), { nameHi: "आशा वर्मा", relationNameHi: "रमेश वर्मा" });
 });
+
+// Shaped like OCR of a physical DL card (fake data): mixed label styles plus some OCR junk.
+import { findLicenceNo, parseDlOcr } from "../src/lib/dl/ocr.ts";
+
+test("parses OCR text from a photo of a driving licence card", () => {
+  const text = [
+    "INDIAN UNION DRIVING LICENCE",
+    "Issued by Government of Maharashtra",
+    "DL No. MH12 20200012345",
+    "Name : ASHA VERMA",
+    "S/D/W of : RAMESH VERMA",
+    "DOB : 15-08-1995   Blood Group : O+",
+    "Address :",
+    "12A MG ROAD, KOTHRUD",
+    "PUNE 411038",
+    "Date of Issue : 10-01-2020",
+    "Validity (NT) : 14-08-2035",
+    "COV : LMV, MCWG",
+    "~ Holder's Signature rr",
+  ].join("\n");
+  const d = parseDlOcr(text);
+  assert.equal(d.licenceNo, "MH12 20200012345");
+  assert.equal(d.name, "ASHA VERMA");
+  assert.equal(d.relation, "RAMESH VERMA");
+  assert.equal(d.dob, "15-08-1995");
+  assert.equal(d.bloodGroup, "O+");
+  assert.equal(d.presentAddress, "12A MG ROAD, KOTHRUD PUNE 411038");
+  assert.equal(d.issueDate, "10-01-2020");
+  assert.equal(d.expiryDate, "14-08-2035");
+  assert.equal(d.classes, "LMV,MCWG");
+});
+
+test("falls back to date order and next-line values when labels are sparse", () => {
+  const d = parseDlOcr(["Name", "ASHA VERMA", "MH-12-2020-0012345", "15/08/1995", "10/01/2020", "14/08/2035"].join("\n"));
+  assert.equal(d.name, "ASHA VERMA");
+  assert.equal(d.licenceNo, "MH12 20200012345");
+  assert.equal(d.dob, "15/08/1995");
+  assert.equal(d.expiryDate, "14/08/2035");
+});
+
+test("finds DL numbers in common formats", () => {
+  assert.equal(findLicenceNo("DL No: DL1 20230012345"), "DL1 20230012345");
+  assert.equal(findLicenceNo("KA0120190012345"), "KA01 20190012345");
+  assert.equal(findLicenceNo("no licence here 1234"), "");
+});
