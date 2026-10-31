@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { isSecureQrText, parseSecureQr, type AadhaarSecureQr } from "@/lib/aadhaar/secureQr";
-import { PasswordRequiredError, scanWithPasswords } from "@/lib/client/scanDocument";
+import { PasswordRequiredError, scanDocument, scanWithPasswords } from "@/lib/client/scanDocument";
+import { fileToCanvas, recognize } from "@/lib/client/ocr";
 import { jp2ToPngDataUrl } from "@/lib/client/decodePhoto";
 import { renderCardFront } from "@/lib/client/renderCard";
 import FilePicker from "./FilePicker";
+import CardPhotos from "./CardPhotos";
 import AddToWalletButton from "./AddToWalletButton";
 import DownloadLinks from "./DownloadLinks";
 
@@ -61,6 +63,36 @@ export default function AadhaarFlow() {
       } else {
         setState({ step: "error", message: err instanceof Error ? err.message : "Something went wrong." });
       }
+    }
+  }
+
+  // Photos of a physical Aadhaar card or letter. The Secure QR holds every detail and the photo; the
+  // printed number is read with on-device OCR and only used if it matches the QR's last 4 digits and
+  // the Aadhaar check digit. Otherwise the card shows the masked number, as with a masked e-Aadhaar.
+  async function readPhotos(files: File[]) {
+    setState({ step: "reading" });
+    try {
+      const scans = await Promise.all(files.map((f) => scanDocument(f, { acceptQr: (q) => isSecureQrText(q.text) })));
+      const qrText = scans.find((s) => s.qr)?.qr?.text;
+      if (!qrText) {
+        throw new Error(
+          "Couldn't find the Aadhaar Secure QR in these photos. Make sure the QR is sharp, flat and fully in frame (or add a photo of the other side).",
+        );
+      }
+      const qr = await parseSecureQr(qrText, decompress);
+      let uid: string | null = null;
+      try {
+        for (const f of files) {
+          uid = findAadhaarNumber((await recognize(await fileToCanvas(f))).text, qr.last4, { checksum: true });
+          if (uid) break;
+        }
+      } catch (err) {
+        console.warn("OCR failed", err);
+      }
+      const card = await renderCardFront(qr, await jp2ToPngDataUrl(qr.photo), { uid });
+      setState({ step: "ready", qrText, vid: null, uid, qr, card });
+    } catch (err) {
+      setState({ step: "error", message: err instanceof Error ? err.message : "Couldn't read these photos." });
     }
   }
 
@@ -155,12 +187,23 @@ export default function AadhaarFlow() {
     <div className="space-y-4">
       <FilePicker
         title="Choose e-Aadhaar PDF"
-        hint="or a clear photo/screenshot of the Aadhaar QR"
-        accept="application/pdf,image/*"
+        hint="From myAadhaar or DigiLocker"
+        accept="application/pdf"
         busy={state.step === "reading"}
         error={state.step === "error" ? state.message : undefined}
         onFile={(file) => read(file)}
-      />
+      >
+        {(locked) => (
+          <CardPhotos
+            locked={locked}
+            busy={state.step === "reading"}
+            frontSub="Tap to take or choose a photo"
+            backSub="Optional · one photo of the side with the QR is enough"
+            tip="All your details and photo come from the QR, so keep it sharp, flat and glare-free. Read on your device."
+            onRead={readPhotos}
+          />
+        )}
+      </FilePicker>
       <DownloadLinks
         title="Don't have your e-Aadhaar?"
         description="Download it free with an OTP on your registered mobile (choose the regular, non-masked version to show your full number), then come back and upload it."
