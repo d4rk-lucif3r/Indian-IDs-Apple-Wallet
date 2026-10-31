@@ -3,7 +3,7 @@
 // Upload area shared by every ID flow. Each upload needs an explicit confirmation that the
 // document is the user's own (or they're authorised) and that they accept the terms; the file
 // picker stays locked until the box is ticked, and the box resets every time the picker is shown.
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { setUploadConfirmed } from "@/lib/client/termsStore";
 
@@ -14,16 +14,16 @@ export default function FilePicker({
   busy,
   error,
   onFile,
-  multiple = false,
+  children,
 }: {
   title: string;
   hint: string;
   accept: string;
   busy: boolean;
   error?: string;
-  // With `multiple`, every chosen file is passed (e.g. front and back photos of a card).
-  onFile: (file: File, all: File[]) => void;
-  multiple?: boolean;
+  onFile: (file: File) => void;
+  // Extra upload options (e.g. card photo slots), locked by the same confirmation.
+  children?: (locked: boolean) => ReactNode;
 }) {
   const [confirmed, setConfirmed] = useState(false);
   const locked = busy || !confirmed;
@@ -61,16 +61,16 @@ export default function FilePicker({
         <input
           type="file"
           accept={accept}
-          multiple={multiple}
           className="sr-only"
           disabled={locked}
           onChange={(e) => {
-            const files = [...(e.target.files ?? [])];
+            const file = e.target.files?.[0];
             e.target.value = "";
-            if (files[0]) onFile(files[0], files);
+            if (file) onFile(file);
           }}
         />
       </label>
+      {children?.(locked)}
       {error && <p className="text-sm text-red-600">{error}</p>}
     </div>
   );

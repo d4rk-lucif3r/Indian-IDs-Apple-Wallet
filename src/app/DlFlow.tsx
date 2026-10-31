@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { parseDlText, type DlDetails } from "@/lib/dl/parse";
 import { parseDlOcr } from "@/lib/dl/ocr";
 import { PasswordRequiredError, scanDocument, scanWithPasswords, type ScannedDocument } from "@/lib/client/scanDocument";
-import { fileToCanvas, isPdf, recognize } from "@/lib/client/ocr";
+import { fileToCanvas, recognize } from "@/lib/client/ocr";
 import { renderDlCard } from "@/lib/client/dlCard";
 import { makeReport } from "@/lib/client/report";
 import FilePicker from "./FilePicker";
@@ -13,14 +13,17 @@ import AddToWalletButton from "./AddToWalletButton";
 import DownloadLinks from "./DownloadLinks";
 import ManualPassword from "./ManualPassword";
 import PhotoPicker from "./PhotoPicker";
+import CardPhotos, { AddBackPhoto } from "./CardPhotos";
 
 type Source = "pdf" | "photo";
+// What was read from card photos, kept so a back photo can be added later.
+type PhotoRead = { scans: ScannedDocument[]; texts: string[] };
 
 type State =
   | { step: "idle" }
   | { step: "reading"; what: string }
   | { step: "password"; file: File; incorrect: boolean }
-  | { step: "ready"; source: Source; photo: string | null; qrText: string | null; report: string }
+  | { step: "ready"; source: Source; photo: string | null; qrText: string | null; report: string; photoRead?: PhotoRead; addingBack?: boolean }
   | { step: "error"; message: string; report: string | null };
 
 const EMPTY: DlDetails = {
@@ -94,20 +97,57 @@ export default function DlFlow() {
     }
   }
 
-  // Photos of the card (front and optionally back): QR from whichever has it, OCR on all of them.
+  // One card photo: QR (if it has one) and on-device OCR text.
+  async function readPhoto(file: File) {
+    const scan = await scanDocument(file, { acceptQr: (q) => q.text.length >= 20 });
+    const text = (await recognize(await fileToCanvas(file))).text;
+    return { scan, text };
+  }
+
+  function fromPhotos(r: PhotoRead) {
+    const parsed = parseDlOcr(r.texts.join("\n"));
+    const qrText = r.scans.find((s) => s.qr)?.qr?.text ?? null;
+    return { parsed, qrText, report: report(parsed, r.scans, "photo", { qr: Boolean(qrText) }) };
+  }
+
+  // Photos of the card (front, and optionally back): QR from whichever has it, OCR on all of them.
   async function readPhotos(files: File[]) {
     try {
       setState({ step: "reading", what: "Reading your card… (first time downloads ~4 MB of text recognition)" });
-      const scans = await Promise.all(files.map((f) => scanDocument(f, { acceptQr: (q) => q.text.length >= 20 })));
-      const texts: string[] = [];
-      for (const f of files) texts.push((await recognize(await fileToCanvas(f))).text);
-      const parsed = parseDlOcr(texts.join("\n"));
-      const qrText = scans.find((s) => s.qr)?.qr?.text ?? null;
+      const read: PhotoRead = { scans: [], texts: [] };
+      for (const f of files) {
+        const { scan, text } = await readPhoto(f);
+        read.scans.push(scan);
+        read.texts.push(text);
+      }
+      const { parsed, qrText, report: r } = fromPhotos(read);
       setDetails(parsed);
       setCard(null);
-      setState({ step: "ready", source: "photo", photo: null, qrText, report: report(parsed, scans, "photo", { qr: Boolean(qrText) }) });
+      setState({ step: "ready", source: "photo", photo: null, qrText, report: r, photoRead: read });
     } catch (err) {
       setState({ step: "error", message: err instanceof Error ? err.message : "Couldn't read these photos.", report: null });
+    }
+  }
+
+  // Back photo added after a front-only read: take its QR, and fill only fields that are still
+  // empty, so nothing the user has already checked or edited is overwritten.
+  async function addBack(file: File) {
+    if (state.step !== "ready" || !state.photoRead) return;
+    const prev = state;
+    const prevRead = state.photoRead;
+    setState({ ...prev, addingBack: true });
+    try {
+      const { scan, text } = await readPhoto(file);
+      const read: PhotoRead = { scans: [...prevRead.scans, scan], texts: [...prevRead.texts, text] };
+      const { parsed, qrText, report: r } = fromPhotos(read);
+      setDetails((d) => {
+        const out = { ...d };
+        for (const [k, v] of Object.entries(parsed) as [keyof DlDetails, string][]) if (v && !out[k]) out[k] = v;
+        return out;
+      });
+      setState({ ...prev, qrText: prev.qrText ?? qrText, report: r, photoRead: read });
+    } catch {
+      setState(prev);
     }
   }
 
@@ -116,8 +156,8 @@ export default function DlFlow() {
   }
 
   if (state.step === "ready") {
-    const { qrText, photo, source } = state;
-    const valid = details.licenceNo.trim().length > 0 && details.name.trim().length > 0 && !!card;
+    const { qrText, photo, source, photoRead, addingBack } = state;
+    const valid = !addingBack && details.licenceNo.trim().length > 0 && details.name.trim().length > 0 && !!card;
     return (
       <div className="space-y-4">
         {card && (
@@ -130,6 +170,11 @@ export default function DlFlow() {
             : "Read from your photos with on-device text recognition. Check every field against your card."}
           {qrText ? " The original QR will be added to the pass." : " No QR was found, so the pass won't have one."}
         </p>
+        {addingBack ? (
+          <p className="text-center text-sm text-neutral-500">Reading the back of your card…</p>
+        ) : (
+          photoRead?.scans.length === 1 && <AddBackPhoto hasQr={!!qrText} onFile={addBack} />
+        )}
         <PhotoPicker hasPhoto={!!photo} onPhoto={(p) => setState({ ...state, photo: p })} />
         <div className="space-y-3">
           {FIELDS.map(([key, label]) => (
@@ -163,18 +208,17 @@ export default function DlFlow() {
   return (
     <div className="space-y-4">
       <FilePicker
-        title="Choose Driving Licence PDF or photos"
-        hint="The DigiLocker PDF, or clear photos of your card (front, and back if it has the QR)"
-        accept="application/pdf,image/*"
-        multiple
+        title="Choose Driving Licence PDF"
+        hint="The PDF from DigiLocker → Issued Documents"
+        accept="application/pdf"
         busy={state.step === "reading"}
         error={state.step === "error" ? state.message : undefined}
-        onFile={(file, all) => {
-          const pdf = all.find(isPdf);
-          if (pdf) readPdf(pdf);
-          else readPhotos(all.slice(0, 2));
-        }}
-      />
+        onFile={(file) => readPdf(file)}
+      >
+        {(locked) => (
+          <CardPhotos locked={locked} busy={state.step === "reading"} backSub="Optional · add it if the QR is on the back" onRead={readPhotos} />
+        )}
+      </FilePicker>
       {state.step === "reading" && <p className="text-center text-xs text-neutral-500">{state.what}</p>}
       {state.step === "error" && state.report && <DiagnosticsPanel idType="Driving Licence" report={state.report} />}
       <DownloadLinks

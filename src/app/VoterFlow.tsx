@@ -5,16 +5,20 @@ import { EMPTY_VOTER, EPIC_PATTERN, parseVoterText, type VoterDetails } from "@/
 import { fieldLineConfidence, parseVoterHindi, parseVoterOcr } from "@/lib/voter/ocr";
 import { makeReport } from "@/lib/client/report";
 import type { DocDiagnostics, OcrRegion } from "@/lib/diagnostics";
-import { PasswordRequiredError, scanDocument, scanWithPasswords } from "@/lib/client/scanDocument";
+import { PasswordRequiredError, scanDocument, scanWithPasswords, type ScannedDocument } from "@/lib/client/scanDocument";
 import { EPIC_PAGE_WIDTH, readVoterPage, type VoterPage } from "@/lib/client/voterCard";
 import { renderVoterCard } from "@/lib/client/voterCardArt";
-import { fileToCanvas, isPdf, recognize, type OcrResult } from "@/lib/client/ocr";
+import { fileToCanvas, recognize, type OcrResult } from "@/lib/client/ocr";
 import FilePicker from "./FilePicker";
 import AddToWalletButton from "./AddToWalletButton";
 import DownloadLinks from "./DownloadLinks";
 import ManualPassword from "./ManualPassword";
 import DiagnosticsPanel from "./DiagnosticsPanel";
 import PhotoPicker from "./PhotoPicker";
+import CardPhotos, { AddBackPhoto } from "./CardPhotos";
+
+// What was read from card photos, kept so a back photo can be added later.
+type PhotoRead = { scans: ScannedDocument[]; eng: OcrResult[]; hin: OcrResult[] };
 
 type State =
   | { step: "idle" }
@@ -27,6 +31,8 @@ type State =
       qrText: string | null;
       ocr: "running" | "done" | "failed";
       report: string | null;
+      photoRead?: PhotoRead;
+      addingBack?: boolean;
     }
   | { step: "error"; message: string; report: string | null };
 
@@ -105,47 +111,75 @@ export default function VoterFlow() {
     };
   }, [details, cardPhoto]);
 
+  const scanPhoto = (file: File) => scanDocument(file, { acceptQr: (q) => q.text.length >= 20 });
+  // OCR one card photo in English and Hindi.
+  async function ocrPhoto(file: File) {
+    const canvas = await fileToCanvas(file);
+    return { eng: await recognize(canvas), hin: await recognize(canvas, { lang: "hin" }) };
+  }
+
+  function fromPhotos(r: PhotoRead) {
+    const engText = r.eng.map((o) => o.text).join("\n");
+    const parsed: VoterDetails = {
+      ...EMPTY_VOTER,
+      ...parseVoterOcr({ front: engText, back: engText, info: engText }),
+      ...parseVoterHindi(r.hin.map((o) => o.text).join("\n")),
+    };
+    const qrText = r.scans.find((s) => s.qr)?.qr?.text ?? null;
+    const regions: OcrRegion[] = r.eng.flatMap((_, i) => [
+      { name: `photo ${i + 1}`, lang: "eng" as const, confidence: r.eng[i].confidence },
+      { name: `photo ${i + 1}`, lang: "hin" as const, confidence: r.hin[i].confidence },
+    ]);
+    const fieldConfidence = fieldLineConfidence([...r.eng, ...r.hin].flatMap((o) => o.lines));
+    const missing = FIELDS.filter(([k]) => !parsed[k]).map(([k]) => k);
+    const outcome = `${r.scans.length} card photo(s), OCR; ${missing.length ? `missing: ${missing.join(", ")}` : "all fields read"}`;
+    return { parsed, qrText, report: voterReport(r.scans[0].diagnostics, outcome, parsed, { regions, fieldConfidence }) };
+  }
+
   // Photos of a physical voter ID card (front, and optionally back): OCR every photo in English
   // and Hindi, and take the QR from whichever photo has it.
   async function readPhotos(files: File[]) {
     setState({ step: "reading" });
     try {
-      const scans = await Promise.all(files.map((f) => scanDocument(f, { acceptQr: (q) => q.text.length >= 20 })));
+      const scans = await Promise.all(files.map(scanPhoto));
       const qrText = scans.find((s) => s.qr)?.qr?.text ?? null;
       setDetails(EMPTY_VOTER);
       setCard(null);
       setState({ step: "ready", source: "photo", photo: null, qrText, ocr: "running", report: null });
       try {
-        const eng: OcrResult[] = [], hin: OcrResult[] = [];
+        const read: PhotoRead = { scans, eng: [], hin: [] };
         for (const f of files) {
-          const canvas = await fileToCanvas(f);
-          eng.push(await recognize(canvas));
-          hin.push(await recognize(canvas, { lang: "hin" }));
+          const p = await ocrPhoto(f);
+          read.eng.push(p.eng);
+          read.hin.push(p.hin);
         }
-        const engText = eng.map((r) => r.text).join("\n");
-        const parsed: VoterDetails = {
-          ...EMPTY_VOTER,
-          ...parseVoterOcr({ front: engText, back: engText, info: engText }),
-          ...parseVoterHindi(hin.map((r) => r.text).join("\n")),
-        };
-        setDetails(parsed);
-        const regions: OcrRegion[] = files.flatMap((_, i) => [
-          { name: `photo ${i + 1}`, lang: "eng" as const, confidence: eng[i].confidence },
-          { name: `photo ${i + 1}`, lang: "hin" as const, confidence: hin[i].confidence },
-        ]);
-        const fieldConfidence = fieldLineConfidence([...eng, ...hin].flatMap((r) => r.lines));
-        const missing = FIELDS.filter(([k]) => !parsed[k]).map(([k]) => k);
-        const outcome = `${files.length} card photo(s), OCR; ${missing.length ? `missing: ${missing.join(", ")}` : "all fields read"}`;
-        setState({
-          step: "ready", source: "photo", photo: null, qrText, ocr: "done",
-          report: voterReport(scans[0].diagnostics, outcome, parsed, { regions, fieldConfidence }),
-        });
+        const res = fromPhotos(read);
+        setDetails(res.parsed);
+        setState({ step: "ready", source: "photo", photo: null, qrText: res.qrText, ocr: "done", report: res.report, photoRead: read });
       } catch (err) {
         console.warn("OCR failed", err);
         setState({ step: "ready", source: "photo", photo: null, qrText, ocr: "failed", report: voterReport(scans[0].diagnostics, "OCR failed") });
       }
     } catch (err) {
       setState({ step: "error", message: err instanceof Error ? err.message : "Couldn't read these photos.", report: null });
+    }
+  }
+
+  // Back photo added after a front-only read: take its QR, and fill only fields that are still
+  // empty, so nothing the user has already checked or edited is overwritten.
+  async function addBack(file: File) {
+    if (state.step !== "ready" || !state.photoRead) return;
+    const prev = state;
+    const prevRead = state.photoRead;
+    setState({ ...prev, addingBack: true });
+    try {
+      const [scan, p] = [await scanPhoto(file), await ocrPhoto(file)];
+      const read: PhotoRead = { scans: [...prevRead.scans, scan], eng: [...prevRead.eng, p.eng], hin: [...prevRead.hin, p.hin] };
+      const res = fromPhotos(read);
+      setDetails((d) => merge(d, res.parsed));
+      setState({ ...prev, qrText: prev.qrText ?? res.qrText, report: res.report, photoRead: read });
+    } catch {
+      setState(prev);
     }
   }
 
@@ -197,8 +231,8 @@ export default function VoterFlow() {
   }
 
   if (state.step === "ready") {
-    const { qrText, ocr, source, photo } = state;
-    const valid = EPIC_PATTERN.test(details.epicNo) && ocr !== "running" && !!card;
+    const { qrText, ocr, source, photo, photoRead, addingBack } = state;
+    const valid = !addingBack && EPIC_PATTERN.test(details.epicNo) && ocr !== "running" && !!card;
     return (
       <div className="space-y-4">
         {card ? (
@@ -212,6 +246,11 @@ export default function VoterFlow() {
         <p className="text-xs text-neutral-500">
           {qrText ? "The original QR will be added to the pass." : "No QR was found, so the pass won't have one."}
         </p>
+        {addingBack ? (
+          <p className="text-center text-sm text-neutral-500">Reading the back of your card…</p>
+        ) : (
+          photoRead?.scans.length === 1 && <AddBackPhoto hasQr={!!qrText} onFile={addBack} />
+        )}
         {source === "photo" && ocr !== "running" && (
           <PhotoPicker hasPhoto={!!photo} onPhoto={(p) => setState({ ...state, photo: p })} />
         )}
@@ -262,18 +301,17 @@ export default function VoterFlow() {
   return (
     <div className="space-y-4">
       <FilePicker
-        title="Choose e-EPIC PDF or card photos"
-        hint="The e-EPIC from the ECI voters portal, or clear photos of your voter ID card (front, and back for the QR)"
-        accept="application/pdf,image/*"
-        multiple
+        title="Choose e-EPIC PDF"
+        hint="The e-EPIC downloaded from the ECI voters portal"
+        accept="application/pdf"
         busy={state.step === "reading"}
         error={state.step === "error" ? state.message : undefined}
-        onFile={(file, all) => {
-          const pdf = all.find(isPdf);
-          if (pdf) read(pdf);
-          else readPhotos(all.slice(0, 2));
-        }}
-      />
+        onFile={(file) => read(file)}
+      >
+        {(locked) => (
+          <CardPhotos locked={locked} busy={state.step === "reading"} backSub="Optional · add it if the QR is on the back" onRead={readPhotos} />
+        )}
+      </FilePicker>
       {state.step === "error" && state.report && <DiagnosticsPanel idType="Voter ID (e-EPIC)" report={state.report} />}
       <DownloadLinks
         title="Don't have your e-EPIC?"
