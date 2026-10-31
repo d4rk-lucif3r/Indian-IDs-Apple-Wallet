@@ -160,6 +160,10 @@ This is an independent project, not affiliated with, endorsed by, or connected t
 
 Apple Wallet and the Apple Wallet badge are trademarks of Apple Inc. The badge is used according to Apple's [Add to Apple Wallet guidelines](https://developer.apple.com/wallet/add-to-apple-wallet-guidelines/).
 
+## License
+
+[MIT](LICENSE) for the code. The Apple Wallet badge (Apple's trademark), the Arsh Anwar logo and third-party dependencies are not covered — see [LICENSE](LICENSE).
+
 ---
 
 Built by [Arsh Anwar](https://www.arshanwar.com).

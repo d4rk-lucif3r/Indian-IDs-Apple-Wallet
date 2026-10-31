@@ -90,6 +90,14 @@ export default function AddToWalletButton({ ready = true, waitingText }: { ready
       {phase === "slow" && (
         <p className="text-center text-xs text-neutral-500">Taking longer than usual — check your connection and tap again.</p>
       )}
+      {/* Said here, at the point it happens: this is the one step where data leaves the device. */}
+      <p className="text-center text-xs leading-relaxed text-neutral-500">
+        Tapping this sends what&apos;s shown on the card — the card image, its details and the QR — to our server, so
+        it can be signed for Apple Wallet. It isn&apos;t stored. Your file itself never leaves this device.{" "}
+        <a href="/terms" target="_blank" className="underline">
+          Privacy details
+        </a>
+      </p>
     </div>
   );
 }

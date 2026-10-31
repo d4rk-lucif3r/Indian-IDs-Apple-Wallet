@@ -34,5 +34,6 @@
   },
   "overrides": {
     "joi": "17.13.9"
-  }
+  },
+  "license": "MIT"
 }
