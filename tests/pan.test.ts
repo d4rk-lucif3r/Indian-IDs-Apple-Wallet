@@ -32,3 +32,28 @@ test("builds the e-PAN password from the date of birth", () => {
   assert.equal(panPdfPassword("1995-06-01"), "01061995");
   assert.equal(panPdfPassword(""), null);
 });
+
+test("PAN card photo OCR: labelled (newer) cards with typical OCR noise", async () => {
+  const { parsePanOcr } = await import("../src/lib/pan/ocr.ts");
+  const ocr = [
+    "आयकर विभाग INCOME TAX DEPARTMENT", "भारत सरकार GOVT. OF INDIA",
+    "Permanent Account Number Card", "ABCPE1Z34F", // Z misread for 2
+    "नाम / Name", "ASHA VERMA |", "पिता का नाम / Father's Name", "~RAMESH KUMAR VERMA",
+    "जन्म की तारीख / Date of Birth", "01-06-1995", "Signature",
+  ].join("\n");
+  assert.deepEqual(parsePanOcr(ocr), { pan: "ABCPE1234F", name: "ASHA VERMA", fatherName: "RAMESH KUMAR VERMA", dob: "01/06/1995" });
+});
+
+test("PAN card photo OCR: older unlabelled cards", async () => {
+  const { parsePanOcr } = await import("../src/lib/pan/ocr.ts");
+  const ocr = ["INCOME TAX DEPARTMENT GOVT. OF INDIA", "ASHA VERMA", "RAMESH VERMA", "01/06/1995", "Permanent Account Number", "ABCPE 1234F", "Signature"].join("\n");
+  assert.deepEqual(parsePanOcr(ocr), { pan: "ABCPE1234F", name: "ASHA VERMA", fatherName: "RAMESH VERMA", dob: "01/06/1995" });
+});
+
+test("PAN normalisation fixes position-wise confusions and rejects non-PANs", async () => {
+  const { normalisePan } = await import("../src/lib/pan/ocr.ts");
+  assert.equal(normalisePan("A8CPE12S4F"), "ABCPE1254F");
+  assert.equal(normalisePan("ABCPEIO34F"), "ABCPE1034F");
+  assert.equal(normalisePan("ABCXE1234F"), null); // 4th char isn't a holder type
+  assert.equal(normalisePan("DEPARTMENT"), null);
+});

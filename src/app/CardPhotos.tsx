@@ -65,7 +65,7 @@ export default function CardPhotos({
   locked: boolean;
   busy: boolean;
   frontSub?: string;
-  backSub: string; // e.g. "Optional · has the QR"
+  backSub?: string; // e.g. "Optional · has the QR"; omit for a single photo (everything on the front)
   tip?: string;
   onRead: (files: File[]) => void;
 }) {
@@ -76,13 +76,19 @@ export default function CardPhotos({
     <div className="space-y-3">
       <div className="flex items-center gap-3 text-xs text-neutral-500">
         <span className="h-px flex-1 bg-neutral-300 dark:bg-neutral-700" />
-        or use photos of your card
+        or use {backSub ? "photos" : "a photo"} of your card
         <span className="h-px flex-1 bg-neutral-300 dark:bg-neutral-700" />
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Slot label="Front" sub={frontSub} file={front} locked={locked} onChange={setFront} />
-        <Slot label="Back" sub={backSub} file={back} locked={locked} onChange={setBack} />
-      </div>
+      {backSub ? (
+        <div className="grid grid-cols-2 gap-3">
+          <Slot label="Front" sub={frontSub} file={front} locked={locked} onChange={setFront} />
+          <Slot label="Back" sub={backSub} file={back} locked={locked} onChange={setBack} />
+        </div>
+      ) : (
+        <div className="mx-auto w-2/3">
+          <Slot label="Front" sub={frontSub} file={front} locked={locked} onChange={setFront} />
+        </div>
+      )}
       <button
         type="button"
         disabled={locked || busy || !(front || back)}

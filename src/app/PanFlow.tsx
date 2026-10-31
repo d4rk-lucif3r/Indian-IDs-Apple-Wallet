@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { PAN_PATTERN, panPdfPassword, parsePanText, type PanDetails } from "@/lib/pan/parse";
-import { PasswordRequiredError, scanWithPasswords } from "@/lib/client/scanDocument";
+import { PasswordRequiredError, scanDocument, scanWithPasswords } from "@/lib/client/scanDocument";
+import { fileToCanvas, recognize } from "@/lib/client/ocr";
+import { parsePanOcr } from "@/lib/pan/ocr";
+import CardPhotos from "./CardPhotos";
 import { renderPanCard } from "@/lib/client/panCard";
 import FilePicker from "./FilePicker";
 import DiagnosticsPanel from "./DiagnosticsPanel";
@@ -82,6 +85,42 @@ export default function PanFlow() {
       } else {
         setState({ step: "error", message: err instanceof Error ? err.message : "Something went wrong." });
       }
+    }
+  }
+
+  // Photo of a physical PAN card: the QR (carried through untouched, as from the e-PAN) and the
+  // printed details via on-device OCR, all editable.
+  async function readPhotos(files: File[]) {
+    setState({ step: "reading" });
+    try {
+      const scans = await Promise.all(files.map((f) => scanDocument(f, { acceptQr: (q) => q.bytes.length >= 32 })));
+      const qr = scans.find((s) => s.qr)?.qr ?? null;
+      let parsed: PanDetails = { pan: "", name: "", fatherName: "", dob: "" };
+      try {
+        const texts: string[] = [];
+        for (const f of files) texts.push((await recognize(await fileToCanvas(f))).text);
+        parsed = parsePanOcr(texts.join("\n"));
+      } catch (err) {
+        console.warn("OCR failed", err);
+      }
+      const found = {
+        pan: Boolean(parsed.pan), name: Boolean(parsed.name), fatherName: Boolean(parsed.fatherName),
+        dob: Boolean(parsed.dob), qr: Boolean(qr),
+      };
+      const missing = Object.entries(found).filter(([, ok]) => !ok).map(([f]) => f);
+      const report = makeReport({
+        idType: "PAN (card photo)",
+        diag: scans[0].diagnostics,
+        fields: found,
+        outcome: `card photo, OCR; ${missing.length ? `missing: ${missing.join(", ")}` : "all fields read"}`,
+      });
+      setDetails(parsed);
+      setState({
+        step: "review",
+        scan: { photo: null, signature: null, qrBase64: qr ? toBase64(qr.bytes) : null, fromImage: true, report },
+      });
+    } catch (err) {
+      setState({ step: "error", message: err instanceof Error ? err.message : "Couldn't read this photo." });
     }
   }
 
@@ -169,7 +208,7 @@ export default function PanFlow() {
         )}
         <p className="text-xs text-neutral-500">
           {fromImage
-            ? "Enter your details exactly as printed on the card."
+            ? "Read from your photo with on-device text recognition. Check every field against your card."
             : "Check the details read from your e-PAN and correct anything that's off."}
           {qrBase64 ? " The original PAN QR will be added to the pass." : " No QR was found, so the pass won't have one."}
         </p>
@@ -218,12 +257,16 @@ export default function PanFlow() {
     <div className="space-y-4">
       <FilePicker
         title="Choose e-PAN PDF"
-        hint="or a clear photo of your PAN card (you'll type the details)"
-        accept="application/pdf,image/*"
+        hint="From UTIITSL, Protean (NSDL) or the e-filing portal"
+        accept="application/pdf"
         busy={state.step === "reading"}
         error={state.step === "error" ? state.message : undefined}
         onFile={(file) => read(file)}
-      />
+      >
+        {(locked) => (
+          <CardPhotos locked={locked} busy={state.step === "reading"} frontSub="Tap to take or choose a photo of the front" onRead={readPhotos} />
+        )}
+      </FilePicker>
       <DownloadLinks
         title="Don't have your e-PAN?"
         description="Download it free from the agency that issued your PAN (it's printed on the back of your card), then come back and upload it."
