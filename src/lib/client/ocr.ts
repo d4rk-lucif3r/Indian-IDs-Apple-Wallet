@@ -46,12 +46,25 @@ function prepare(source: HTMLCanvasElement, scale = 2, threshold = 140): HTMLCan
 
 export type PageSegMode = "3" | "6"; // 3 = automatic layout (cards), 6 = single uniform block
 
+export interface OcrLine {
+  text: string;
+  confidence: number; // 0–100
+}
+
+export interface OcrResult {
+  text: string;
+  confidence: number; // whole region, 0–100
+  lines: OcrLine[]; // per line, for reading reports
+}
+
 export async function recognize(
   source: HTMLCanvasElement,
   { psm = "3", lang = "eng" }: { psm?: PageSegMode; lang?: OcrLang } = {},
-): Promise<string> {
+): Promise<OcrResult> {
   const w = await worker(lang);
   await w.setParameters({ tessedit_pageseg_mode: psm as PSM });
-  const { data } = await w.recognize(prepare(source));
-  return data.text;
+  const { data } = await w.recognize(prepare(source), {}, { text: true, blocks: true });
+  const lines = (data.blocks ?? []).flatMap((b) => b.paragraphs.flatMap((p) => p.lines))
+    .map((l) => ({ text: l.text.trim(), confidence: l.confidence }));
+  return { text: data.text, confidence: data.confidence, lines };
 }

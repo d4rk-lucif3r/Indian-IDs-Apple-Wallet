@@ -97,3 +97,27 @@ export function parseVoterHindi(text: string): Pick<VoterDetails, "nameHi" | "re
   }
   return { nameHi, relationNameHi };
 }
+
+// For reading reports: the OCR confidence of the line each field's label was found on (by label
+// only, never by value), so a report can show whether Hindi or English lines are failing.
+const FIELD_LABELS: Record<string, RegExp> = {
+  epicNo: /Epic no/i,
+  name: /^(?!.*(Father|Husband|Mother|Wife|Guardian)).*\bName\s*[:;.]/i,
+  relationName: /(Father|Husband|Mother|Wife|Guardian)['’`]?s?\s*Name/i,
+  gender: /Gender/i,
+  dob: /Date of Birth|\bAge\b/i,
+  address: /Address\s*[:;.]/i,
+  ero: /Electoral Registration Officer/i,
+  serialNo: /Serial No/i,
+  constituency: /Assembly Constituency/i,
+  part: /Part No/i,
+  pollingStation: /Polling Station/i,
+  nameHi: /^(?!.*(पिता|पति|माता|पत्नी)).*नाम\s*[:ः]/u,
+  relationNameHi: /(पिता|पति|माता|पत्नी)\s*का\s*नाम/u,
+};
+
+export function fieldLineConfidence(lines: { text: string; confidence: number }[]): Record<string, number | null> {
+  return Object.fromEntries(
+    Object.entries(FIELD_LABELS).map(([field, label]) => [field, lines.find((l) => label.test(l.text))?.confidence ?? null]),
+  );
+}

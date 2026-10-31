@@ -45,6 +45,8 @@ So this project takes the official e-documents you can already download (e-Aadha
 
 On the back of each pass (ⓘ) you'll find every detail in full, how to verify the QR, and for dense QRs (Aadhaar, PAN) a **Show large QR** link that displays the code full-screen so verifier apps can scan it.
 
+**Something not read correctly?** Every e-PAN, e-EPIC and DigiLocker DL flow has a *Report it privately* panel. It builds a reading report on the device describing only the document's layout — page size, text layer, image sizes and roles, QR length, issuer keywords, which fields were found and (for OCR) confidence per field and region — with no names, numbers, photos or document text. You can review it, copy it, or open a prefilled GitHub issue.
+
 ## Supported IDs
 
 | ID | Upload | Where to get it | Unlock | What's read | QR on the pass |

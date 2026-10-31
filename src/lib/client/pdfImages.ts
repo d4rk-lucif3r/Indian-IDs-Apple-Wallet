@@ -1,5 +1,6 @@
 // Browser-only: picks the holder's photo and signature out of a PDF's embedded images.
 import type { PDFPageProxy } from "pdfjs-dist";
+import type { ImageInfo } from "@/lib/diagnostics";
 
 interface PdfImage {
   width: number;
@@ -121,6 +122,7 @@ function trimToInk(source: HTMLCanvasElement): HTMLCanvasElement | null {
 export interface PageImages {
   photo: string | null;
   signature: string | null; // PNG data URL, transparency preserved
+  images: ImageInfo[]; // every image considered, with the role it was given (for reading reports)
 }
 
 const MAX_SIDE = 2000; // larger images are page backgrounds/scans, never the photo or signature
@@ -160,6 +162,7 @@ export async function findImagesInPage(page: PDFPageProxy, OPS: PdfOps): Promise
   let photo: { canvas: HTMLCanvasElement; area: number } | null = null;
   let signature: { canvas: HTMLCanvasElement; area: number } | null = null;
   const seen = new Set<string>();
+  const images: ImageInfo[] = [];
 
   // Track the transform matrix so we know each image's drawn size on the page.
   let ctm: Matrix = [1, 0, 0, 1, 0, 0];
@@ -177,11 +180,16 @@ export async function findImagesInPage(page: PDFPageProxy, OPS: PdfOps): Promise
     seen.add(id);
     const drawnW = Math.hypot(ctm[0], ctm[1]);
     const drawnH = Math.hypot(ctm[2], ctm[3]);
-    if (drawnW * drawnH > 0.3 * pageW * pageH) continue; // page background, not a card element
-
     const store = id.startsWith("g_") ? page.commonObjs : page.objs;
     const img: PdfImage | null = await new Promise((resolve) => store.get(id, resolve));
-    if (!img || img.width < 60 || Math.max(img.width, img.height) > MAX_SIDE) continue;
+    if (!img) continue;
+    const info: ImageInfo = { w: img.width, h: img.height, drawnW, drawnH, role: "other" };
+    images.push(info);
+    if (drawnW * drawnH > 0.3 * pageW * pageH) {
+      info.role = "background"; // page background, not a card element
+      continue;
+    }
+    if (img.width < 60 || Math.max(img.width, img.height) > MAX_SIDE) continue;
 
     const raw = toCanvas(img);
     if (!raw) continue;
@@ -196,6 +204,7 @@ export async function findImagesInPage(page: PDFPageProxy, OPS: PdfOps): Promise
     const isPhoto =
       photoShape && m.colourfulness >= 15 && ((m.whiteness <= 0.3 && m.variety >= 0.05) || (m.whiteness <= 0.6 && m.variety >= 0.12));
     if (isPhoto) {
+      info.role = "photo";
       if (!photo || area > photo.area) photo = { canvas, area };
       continue;
     }
@@ -208,6 +217,7 @@ export async function findImagesInPage(page: PDFPageProxy, OPS: PdfOps): Promise
       const inkRatio = ink.height / ink.width;
       const inkArea = ink.width * ink.height;
       if (inkRatio >= 0.08 && inkRatio <= 0.8 && ink.width >= 60) {
+        info.role = "signature";
         if (!signature || inkArea > signature.area) signature = { canvas: ink, area: inkArea };
       }
     }
@@ -215,5 +225,6 @@ export async function findImagesInPage(page: PDFPageProxy, OPS: PdfOps): Promise
   return {
     photo: photo ? onWhite(photo.canvas) : null,
     signature: signature ? signature.canvas.toDataURL("image/png") : null,
+    images,
   };
 }

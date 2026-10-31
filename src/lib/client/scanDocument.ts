@@ -1,6 +1,7 @@
 // Browser-only: reads an uploaded ID document (PDF or image) locally — QR, printed text,
 // photo and signature. The file never leaves the device.
 import { findImagesInPage } from "./pdfImages";
+import { issuerHints, sanitizeMeta, type DocDiagnostics, type ImageInfo } from "@/lib/diagnostics";
 
 export class PasswordRequiredError extends Error {
   constructor(public incorrect: boolean) {
@@ -19,7 +20,11 @@ export interface ScannedDocument {
   photo: string | null; // PNG data URL
   signature: string | null; // PNG data URL
   page: HTMLCanvasElement | null; // page 1 rendered at `pageWidth`, when requested
+  diagnostics: DocDiagnostics; // document shape only (no values), for privacy-safe reading reports
 }
+
+const qrDiag = (qr: ScannedQr | null): DocDiagnostics["qr"] =>
+  qr ? { found: true, chars: qr.text.length, bytes: qr.bytes.length, digitsOnly: /^\d+$/.test(qr.text) } : { found: false };
 
 export type QrFilter = (qr: ScannedQr) => boolean;
 
@@ -76,15 +81,40 @@ async function scanPdf(
     let text = "";
     let photo: string | null = null;
     let signature: string | null = null;
+    let textItems = 0;
+    let textChars = 0;
+    const allImages: ImageInfo[] = [];
     for (let n = 1; n <= doc.numPages; n++) {
       const page = await doc.getPage(n);
       const content = await page.getTextContent();
+      const strings = content.items.map((item) => ("str" in item ? item.str : ""));
       // One line per text item: some documents are values-only, and line boundaries carry the meaning.
-      text += content.items.map((item) => ("str" in item ? item.str : "")).join("\n") + "\n";
+      text += strings.join("\n") + "\n";
+      textItems += strings.filter((s) => s.trim()).length;
+      textChars += strings.reduce((sum, s) => sum + s.trim().length, 0);
       const images = await findImagesInPage(page, lib.OPS).catch(() => null);
       photo ??= images?.photo ?? null;
       signature ??= images?.signature ?? null;
+      allImages.push(...(images?.images ?? []));
     }
+
+    // Shape of the document for reading reports — counts, sizes and sanitised software names only.
+    const meta = await doc.getMetadata().catch(() => null);
+    const info = (meta?.info ?? {}) as Record<string, unknown>;
+    const size = (await doc.getPage(1)).getViewport({ scale: 1 });
+    const diag = (qr: ScannedQr | null): DocDiagnostics => ({
+      kind: "pdf",
+      pages: doc.numPages,
+      pageSizePt: [Math.round(size.width), Math.round(size.height)],
+      passwordProtected: Boolean(password),
+      producer: sanitizeMeta(info.Producer),
+      creator: sanitizeMeta(info.Creator),
+      textItems,
+      textChars,
+      images: allImages,
+      qr: qrDiag(qr),
+      issuerHints: issuerHints(`${text} ${String(info.Producer ?? "")} ${String(info.Creator ?? "")} ${file.name}`),
+    });
 
     // Some documents are used as images (e.g. the e-EPIC card renders): keep page 1 at the
     // requested width, and look for the QR there first.
@@ -98,7 +128,7 @@ async function scanPdf(
       await page.render({ canvas: pageCanvas, viewport }).promise;
       const ctx = pageCanvas.getContext("2d")!;
       const qr = await findQr(ctx.getImageData(0, 0, pageCanvas.width, pageCanvas.height), accept);
-      if (qr) return { qr, text, photo, signature, page: pageCanvas };
+      if (qr) return { qr, text, photo, signature, page: pageCanvas, diagnostics: diag(qr) };
     }
 
     // Dense QRs (Aadhaar, PAN) need a high render scale; high scales are slow and can exceed
@@ -114,10 +144,10 @@ async function scanPdf(
         const ctx = canvas.getContext("2d")!;
         const qr = await findQr(ctx.getImageData(0, 0, canvas.width, canvas.height), accept);
         canvas.width = canvas.height = 0; // release memory early on phones
-        if (qr) return { qr, text, photo, signature, page: pageCanvas };
+        if (qr) return { qr, text, photo, signature, page: pageCanvas, diagnostics: diag(qr) };
       }
     }
-    return { qr: null, text, photo, signature, page: pageCanvas };
+    return { qr: null, text, photo, signature, page: pageCanvas, diagnostics: diag(null) };
   } finally {
     await task.destroy();
   }
@@ -135,7 +165,16 @@ export async function scanDocument(
   if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
     return scanPdf(file, password, acceptQr, pageWidth);
   }
-  return { qr: await findQr(file, acceptQr), text: "", photo: null, signature: null, page: null };
+  const qr = await findQr(file, acceptQr);
+  const bitmap = await createImageBitmap(file).catch(() => null);
+  const diagnostics: DocDiagnostics = {
+    kind: "image",
+    imageSizePx: bitmap ? [bitmap.width, bitmap.height] : undefined,
+    qr: qrDiag(qr),
+    issuerHints: issuerHints(file.name),
+  };
+  bitmap?.close();
+  return { qr, text: "", photo: null, signature: null, page: null, diagnostics };
 }
 
 // Tries each candidate password in turn; an empty list means "try without a password".

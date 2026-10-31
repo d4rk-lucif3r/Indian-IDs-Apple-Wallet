@@ -5,6 +5,8 @@ import { PAN_PATTERN, panPdfPassword, parsePanText, type PanDetails } from "@/li
 import { PasswordRequiredError, scanWithPasswords } from "@/lib/client/scanDocument";
 import { renderPanCard } from "@/lib/client/panCard";
 import FilePicker from "./FilePicker";
+import DiagnosticsPanel from "./DiagnosticsPanel";
+import { makeReport } from "@/lib/client/report";
 import AddToWalletButton from "./AddToWalletButton";
 import DownloadLinks from "./DownloadLinks";
 
@@ -13,6 +15,7 @@ interface Scan {
   signature: string | null;
   qrBase64: string | null; // raw PAN QR payload; it's encrypted, so carried through untouched
   fromImage: boolean; // card photo rather than e-PAN PDF: no text or images to extract
+  report: string; // privacy-safe reading report (layout + which fields were found, no values)
 }
 
 type State =
@@ -48,6 +51,18 @@ export default function PanFlow() {
     try {
       const scanned = await scanWithPasswords(file, passwords, (q) => q.bytes.length >= 32);
       const parsed = parsePanText(scanned.text);
+      // What the document itself yielded, before any fallback or typing — for the reading report.
+      const found = {
+        pan: Boolean(parsed.pan), name: Boolean(parsed.name), fatherName: Boolean(parsed.fatherName),
+        dob: Boolean(parsed.dob), photo: Boolean(scanned.photo), signature: Boolean(scanned.signature), qr: Boolean(scanned.qr),
+      };
+      const missing = Object.entries(found).filter(([, ok]) => !ok).map(([f]) => f);
+      const report = makeReport({
+        idType: "PAN",
+        diag: scanned.diagnostics,
+        fields: found,
+        outcome: missing.length ? `read with missing fields: ${missing.join(", ")}` : "all fields read",
+      });
       if (!parsed.dob && dobIso) parsed.dob = dobIso.split("-").reverse().join("/");
       setDetails(parsed);
       setPassword("");
@@ -58,6 +73,7 @@ export default function PanFlow() {
           signature: scanned.signature,
           qrBase64: scanned.qr ? toBase64(scanned.qr.bytes) : null,
           fromImage: !file.type.includes("pdf") && !file.name.toLowerCase().endsWith(".pdf"),
+          report,
         },
       });
     } catch (err) {
@@ -193,6 +209,7 @@ export default function PanFlow() {
         <button className="w-full text-sm text-neutral-500 underline" onClick={() => setState({ step: "idle" })}>
           Use a different file
         </button>
+        <DiagnosticsPanel idType="PAN" report={reviewScan.report} />
       </div>
     );
   }

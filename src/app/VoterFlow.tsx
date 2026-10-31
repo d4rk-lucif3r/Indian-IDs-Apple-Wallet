@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { EMPTY_VOTER, EPIC_PATTERN, parseVoterText, type VoterDetails } from "@/lib/voter/parse";
-import { parseVoterHindi, parseVoterOcr } from "@/lib/voter/ocr";
+import { fieldLineConfidence, parseVoterHindi, parseVoterOcr } from "@/lib/voter/ocr";
+import { makeReport } from "@/lib/client/report";
+import type { DocDiagnostics, OcrRegion } from "@/lib/diagnostics";
 import { PasswordRequiredError, scanWithPasswords } from "@/lib/client/scanDocument";
 import { EPIC_PAGE_WIDTH, readVoterPage, type VoterPage } from "@/lib/client/voterCard";
 import { renderVoterCard } from "@/lib/client/voterCardArt";
@@ -11,13 +13,14 @@ import FilePicker from "./FilePicker";
 import AddToWalletButton from "./AddToWalletButton";
 import DownloadLinks from "./DownloadLinks";
 import ManualPassword from "./ManualPassword";
+import DiagnosticsPanel from "./DiagnosticsPanel";
 
 type State =
   | { step: "idle" }
   | { step: "reading" }
   | { step: "password"; file: File; incorrect: boolean }
-  | { step: "ready"; photo: string; qrText: string | null; ocr: "running" | "done" | "failed" }
-  | { step: "error"; message: string };
+  | { step: "ready"; photo: string; qrText: string | null; ocr: "running" | "done" | "failed"; report: string | null }
+  | { step: "error"; message: string; report: string | null };
 
 const FIELDS: [keyof VoterDetails, string][] = [
   ["epicNo", "EPIC No."],
@@ -42,12 +45,40 @@ function merge(base: VoterDetails, extra: Partial<VoterDetails>): VoterDetails {
   return out;
 }
 
-async function ocrPage(page: VoterPage): Promise<Partial<VoterDetails>> {
+async function ocrPage(page: VoterPage) {
   const front = await recognize(page.front);
   const back = await recognize(page.back);
   const info = await recognize(page.info, { psm: "6" });
   const names = await recognize(page.names, { psm: "6", lang: "hin" });
-  return { ...parseVoterOcr({ front, back, info }), ...parseVoterHindi(names) };
+  const details: Partial<VoterDetails> = {
+    ...parseVoterOcr({ front: front.text, back: back.text, info: info.text }),
+    ...parseVoterHindi(names.text),
+  };
+  // Confidence only (no text) for reading reports: per region, and per field via its label's line.
+  const regions: OcrRegion[] = [
+    { name: "card front", lang: "eng", confidence: front.confidence },
+    { name: "card back", lang: "eng", confidence: back.confidence },
+    { name: "details block", lang: "eng", confidence: info.confidence },
+    { name: "name block", lang: "hin", confidence: names.confidence },
+  ];
+  const fieldConfidence = fieldLineConfidence([...front.lines, ...back.lines, ...info.lines, ...names.lines]);
+  return { details, regions, fieldConfidence };
+}
+
+function voterReport(
+  diag: DocDiagnostics,
+  outcome: string,
+  details?: VoterDetails,
+  ocr?: { regions: OcrRegion[]; fieldConfidence: Record<string, number | null> },
+) {
+  return makeReport({
+    idType: "Voter ID (e-EPIC)",
+    diag,
+    outcome,
+    fields: details ? Object.fromEntries(FIELDS.map(([k]) => [k, Boolean(details[k])])) : {},
+    fieldConfidence: ocr?.fieldConfidence,
+    ocrRegions: ocr?.regions,
+  });
 }
 
 export default function VoterFlow() {
@@ -74,28 +105,38 @@ export default function VoterFlow() {
         pageWidth: EPIC_PAGE_WIDTH,
       });
       if (!scanned.page) throw new Error("Upload the e-EPIC PDF downloaded from voters.eci.gov.in.");
-      const page = readVoterPage(scanned.page);
+      let page: VoterPage;
+      try {
+        page = readVoterPage(scanned.page);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Couldn't read this e-EPIC.";
+        setState({ step: "error", message, report: voterReport(scanned.diagnostics, "card layout not recognised as an e-EPIC") });
+        return;
+      }
       const fromText = parseVoterText(scanned.text, file.name);
       setDetails(fromText);
       setCard(null);
       const qrText = scanned.qr?.text ?? null;
-      setState({ step: "ready", photo: page.photo, qrText, ocr: "running" });
+      setState({ step: "ready", photo: page.photo, qrText, ocr: "running", report: null });
 
       // OCR fills whatever the text layer couldn't (all of it, for image-only e-EPICs).
       try {
-        const fromOcr = await ocrPage(page);
+        const ocr = await ocrPage(page);
         // Fields are locked while OCR runs, so nothing user-edited is overwritten here. For
         // image-only files a valid OCR'd EPIC beats one guessed from the file name.
-        const base = scanned.text.trim() ? fromText : { ...fromText, epicNo: fromOcr.epicNo || fromText.epicNo };
-        setDetails(merge(base, fromOcr));
-        setState({ step: "ready", photo: page.photo, qrText, ocr: "done" });
+        const base = scanned.text.trim() ? fromText : { ...fromText, epicNo: ocr.details.epicNo || fromText.epicNo };
+        const merged = merge(base, ocr.details);
+        setDetails(merged);
+        const missing = FIELDS.filter(([k]) => !merged[k]).map(([k]) => k);
+        const outcome = `${scanned.text.trim() ? "text layer + OCR" : "image-only, OCR"}; ${missing.length ? `missing: ${missing.join(", ")}` : "all fields read"}`;
+        setState({ step: "ready", photo: page.photo, qrText, ocr: "done", report: voterReport(scanned.diagnostics, outcome, merged, ocr) });
       } catch (err) {
         console.warn("OCR failed", err);
-        setState({ step: "ready", photo: page.photo, qrText, ocr: "failed" });
+        setState({ step: "ready", photo: page.photo, qrText, ocr: "failed", report: voterReport(scanned.diagnostics, "OCR failed", fromText) });
       }
     } catch (err) {
       if (err instanceof PasswordRequiredError) setState({ step: "password", file, incorrect: err.incorrect });
-      else setState({ step: "error", message: err instanceof Error ? err.message : "Something went wrong." });
+      else setState({ step: "error", message: err instanceof Error ? err.message : "Something went wrong.", report: null });
     }
   }
 
@@ -155,6 +196,7 @@ export default function VoterFlow() {
         <button className="w-full text-sm text-neutral-500 underline" onClick={() => setState({ step: "idle" })}>
           Use a different file
         </button>
+        {state.report && <DiagnosticsPanel idType="Voter ID (e-EPIC)" report={state.report} />}
       </div>
     );
   }
@@ -169,6 +211,7 @@ export default function VoterFlow() {
         error={state.step === "error" ? state.message : undefined}
         onFile={(file) => read(file)}
       />
+      {state.step === "error" && state.report && <DiagnosticsPanel idType="Voter ID (e-EPIC)" report={state.report} />}
       <DownloadLinks
         title="Don't have your e-EPIC?"
         description="Download it free from the ECI voters portal (log in with your mobile number, then e-EPIC Download), then come back and upload it."
